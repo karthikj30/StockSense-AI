@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String           @id @default(cuid())
+  email     String           @unique
+  name      String?
+  image     String?
+  password  String?
+  createdAt DateTime         @default(now())
+  watchlist Watchlist[]
+  portfolio Portfolio[]
+  progress  LessonProgress[]
+}
+
+model Watchlist {
+  id      String   @id @default(cuid())
+  userId  String
+  symbol  String
+  addedAt DateTime @default(now())
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, symbol])
+}
+
+model Portfolio {
+  id       String   @id @default(cuid())
+  userId   String
+  symbol   String
+  buyPrice Float
+  quantity Int
+  buyDate  DateTime
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model LessonProgress {
+  id        String  @id @default(cuid())
+  userId    String
+  lessonId  String
+  completed Boolean @default(false)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
