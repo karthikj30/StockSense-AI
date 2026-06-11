@@ -1,17 +1,24 @@
-import { unstable_cache } from "next/cache";
 import { NextResponse } from "next/server";
 
-import { generateDailyTip } from "@/lib/api/claude";
+import { getCache, setCache, CACHE_TTL } from "@/lib/cache";
+import { generateDailyTipWithGemini } from "@/lib/gemini";
 
-const getCachedDailyTip = unstable_cache(
-  async () => generateDailyTip(),
-  ["daily-tip"],
-  { revalidate: 86400, tags: ["daily-tip"] }
-);
+export const maxDuration = 30;
 
 export async function GET() {
+  const key = `daily-tip:${new Date().toDateString()}`;
+  const cached = getCache(key);
+  if (cached) {
+    return NextResponse.json(cached, {
+      headers: {
+        "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=3600",
+      },
+    });
+  }
+
   try {
-    const tip = await getCachedDailyTip();
+    const tip = await generateDailyTipWithGemini();
+    setCache(key, tip, CACHE_TTL.DAILY_TIP);
     return NextResponse.json(tip, {
       headers: {
         "Cache-Control": "public, s-maxage=86400, stale-while-revalidate=3600",

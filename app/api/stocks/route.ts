@@ -1,16 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { fetchBatchStocks } from "@/lib/api/data-service";
+import { getCache, setCache, CACHE_TTL } from "@/lib/cache";
 import { NSE_TOP_STOCKS } from "@/lib/data/nse-stocks";
+import { batchStockQuotes } from "@/lib/stock-data";
 import { normalizeSymbol } from "@/lib/utils/formatters";
 
-interface LiveStock {
-  symbol: string;
-  name?: string;
-  sector?: string;
-  currentPrice?: number;
-  changePercent?: number;
-}
+export const maxDuration = 30;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -23,17 +18,15 @@ export async function GET(request: NextRequest) {
       .map((s) => normalizeSymbol(s.trim()))
       .filter(Boolean);
 
-    if (!symbols.length) {
-      return NextResponse.json([]);
-    }
+    if (!symbols.length) return NextResponse.json([]);
 
     try {
-      const stocks = (await fetchBatchStocks(symbols)) as LiveStock[];
+      const stocks = await batchStockQuotes(symbols);
       return NextResponse.json(stocks);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to fetch stocks";
-      return NextResponse.json({ error: message }, { status: 502 });
+      return NextResponse.json({ error: message }, { status: 500 });
     }
   }
 
@@ -51,9 +44,16 @@ export async function GET(request: NextRequest) {
 
   try {
     const symbols = stocks.map((s) => s.symbol);
-    const liveData = (await fetchBatchStocks(symbols)) as LiveStock[];
-    const priceMap = new Map(liveData.map((s) => [s.symbol, s]));
+    const cacheKey = `stocks:list:${symbols.join(",")}`;
+    let liveData = getCache<Awaited<ReturnType<typeof batchStockQuotes>>>(
+      cacheKey
+    );
+    if (!liveData) {
+      liveData = await batchStockQuotes(symbols);
+      setCache(cacheKey, liveData, CACHE_TTL.STOCK_QUOTE);
+    }
 
+    const priceMap = new Map(liveData.map((s) => [s.symbol, s]));
     const enriched = stocks.map((stock) => {
       const live = priceMap.get(stock.symbol);
       return {

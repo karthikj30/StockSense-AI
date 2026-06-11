@@ -5,7 +5,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  serverExternalPackages: ["yahoo-finance2"],
   outputFileTracingRoot: __dirname,
 };
 

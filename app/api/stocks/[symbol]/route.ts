@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { fetchStockInfo, fetchTechnicalData } from "@/lib/api/data-service";
+import { getCache, setCache, CACHE_TTL } from "@/lib/cache";
+import { computeTechnicals } from "@/lib/indicators";
+import {
+  getCandleData,
+  getStockQuote,
+  getStockSummary,
+} from "@/lib/stock-data";
 import { slugToSymbol } from "@/lib/utils/formatters";
+
+export const maxDuration = 30;
 
 export async function GET(
   request: NextRequest,
@@ -12,18 +20,31 @@ export async function GET(
   const includeTechnical =
     request.nextUrl.searchParams.get("include") === "technical";
 
-  try {
-    const stock = await fetchStockInfo(symbol);
+  const cacheKey = `quote:${symbol}`;
+  let data = getCache<Record<string, unknown>>(cacheKey);
 
-    if (includeTechnical) {
-      const technical = await fetchTechnicalData(symbol);
-      return NextResponse.json({
-        ...(stock as Record<string, unknown>),
-        technical,
-      });
+  try {
+    if (!data) {
+      const [quote, summary] = await Promise.all([
+        getStockQuote(symbol),
+        getStockSummary(symbol),
+      ]);
+      data = {
+        ...quote,
+        ...(summary ?? {}),
+        sector: summary?.sector || quote.sector,
+        industry: summary?.industry || quote.industry,
+      };
+      setCache(cacheKey, data, CACHE_TTL.STOCK_QUOTE);
     }
 
-    return NextResponse.json(stock);
+    if (includeTechnical) {
+      const candles = await getCandleData(symbol, "6mo", "1d");
+      const technical = computeTechnicals(candles, symbol);
+      return NextResponse.json({ ...data, technical });
+    }
+
+    return NextResponse.json(data);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Stock not found";

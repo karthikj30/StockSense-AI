@@ -1,14 +1,37 @@
 import { NextResponse } from "next/server";
 
-import { fetchTrending } from "@/lib/api/data-service";
+import { getCache, setCache, CACHE_TTL } from "@/lib/cache";
+import { batchStockQuotes } from "@/lib/stock-data";
+
+export const maxDuration = 30;
+
+const TRENDING = [
+  "RELIANCE.NS",
+  "TCS.NS",
+  "INFY.NS",
+  "HDFCBANK.NS",
+  "ICICIBANK.NS",
+  "WIPRO.NS",
+  "TATAMOTORS.NS",
+  "BAJFINANCE.NS",
+  "SUNPHARMA.NS",
+  "ADANIENT.NS",
+  "SBIN.NS",
+  "MARUTI.NS",
+];
 
 export async function GET() {
+  const cacheKey = "market:trending";
+  const cached = getCache(cacheKey);
+  if (cached) return NextResponse.json(cached);
+
   try {
-    const trending = await fetchTrending();
-    return NextResponse.json(trending);
+    const data = await batchStockQuotes(TRENDING);
+    setCache(cacheKey, data, CACHE_TTL.STOCK_QUOTE);
+    return NextResponse.json(data);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch trending";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

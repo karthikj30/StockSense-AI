@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { chatWithAI } from "@/lib/api/claude";
+import { chatWithGemini } from "@/lib/gemini";
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const reply = await chatWithAI(messages, stockContext);
+    const reply = await chatWithGemini(messages, stockContext);
     return NextResponse.json({ reply });
   } catch (error) {
     const message =

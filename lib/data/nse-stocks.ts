@@ -56,3 +56,13 @@ export const NSE_TOP_STOCKS: NseStock[] = [
   { symbol: "GODREJCP.NS", name: "Godrej Consumer Products", sector: "FMCG" },
   { symbol: "PIDILITIND.NS", name: "Pidilite Industries", sector: "Chemical" },
 ];
+
+export const NSE_STOCKS = NSE_TOP_STOCKS;
+
+export const MARKET_INDICES = [
+  { symbol: "^NSEI", name: "Nifty 50" },
+  { symbol: "^BSESN", name: "Sensex" },
+  { symbol: "^NSEBANK", name: "Bank Nifty" },
+  { symbol: "^CNXIT", name: "Nifty IT" },
+  { symbol: "^CNXAUTO", name: "Nifty Auto" },
+];

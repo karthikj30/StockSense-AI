@@ -1,7 +1,5 @@
 import NextAuth from "next-auth";
-import Google from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
-import { compare, hash } from "bcryptjs";
+import GitHub from "next-auth/providers/github";
 
 import { prisma } from "@/lib/db";
 
@@ -11,51 +9,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     signIn: "/login",
   },
   providers: [
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
       ? [
-          Google({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+          GitHub({
+            clientId: process.env.GITHUB_ID,
+            clientSecret: process.env.GITHUB_SECRET,
           }),
         ]
       : []),
-    Credentials({
-      name: "credentials",
-      credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
-      },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-
-        const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.password) return null;
-
-        const valid = await compare(password, user.password);
-        if (!valid) return null;
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
-      },
-    }),
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (account?.provider === "google" && user.email) {
+      if (account?.provider === "github" && user.email) {
         await prisma.user.upsert({
           where: { email: user.email },
-          update: { name: user.name, image: user.image },
+          update: {
+            name: user.name,
+            image: user.image,
+            githubId: account.providerAccountId,
+          },
           create: {
             email: user.email,
             name: user.name,
             image: user.image,
+            githubId: account.providerAccountId,
           },
         });
       }
@@ -67,7 +44,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           where: { email: user.email },
         });
         if (dbUser) token.id = dbUser.id;
-      } else if (account?.provider === "google" && token.email) {
+      } else if (account?.provider === "github" && token.email) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email as string },
         });
@@ -83,19 +60,3 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
 });
-
-export async function registerUser(
-  email: string,
-  password: string,
-  name?: string
-) {
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    throw new Error("Email already registered");
-  }
-
-  const hashed = await hash(password, 12);
-  return prisma.user.create({
-    data: { email, password: hashed, name },
-  });
-}
